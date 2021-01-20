@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"math/rand"
 	"net"
 	"net/http"
@@ -554,7 +555,7 @@ func (c Client) executeMethod(ctx context.Context, method string, metadata reque
 	// Blank indentifier is kept here on purpose since 'range' without
 	// blank identifiers is only supported since go1.4
 	// https://golang.org/doc/go1.4#forrange.
-	for range c.newRetryTimer(retryCtx, reqRetry, DefaultRetryUnit, DefaultRetryCap, MaxJitter) {
+	for attempt := range c.newRetryTimer(retryCtx, reqRetry, DefaultRetryUnit, DefaultRetryCap, MaxJitter) {
 		// Retry executes the following function body if request has an
 		// error until maxRetries have been exhausted, retry attempts are
 		// performed after waiting for a given period of time in a
@@ -615,6 +616,8 @@ func (c Client) executeMethod(ctx context.Context, method string, metadata reque
 		// Save the body back again.
 		errBodySeeker.Seek(0, 0) // Seek back to starting point.
 		res.Body = ioutil.NopCloser(errBodySeeker)
+
+		log.Printf("[minio executeMethod retry]: attempt: %d, reqRetry: %d, isRetryable: %t, object: %s, error_code: %s, status_code: %d", attempt, reqRetry, isRetryable, metadata.objectName, errResponse.Code, res.StatusCode)
 
 		// Bucket region if set in error response and the error
 		// code dictates invalid region, we can retry the request
